@@ -21,6 +21,7 @@ void slow_handler();
 int
 main(int argc, char *argv[])
 {
+    //printf("%p\n",periodic);
   test0();
   test1();
   test2();

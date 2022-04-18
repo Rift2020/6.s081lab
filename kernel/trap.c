@@ -75,7 +75,31 @@ usertrap(void)
 
   if(p->killed)
     exit(-1);
-
+  //alarm
+  if(which_dev == 2&&p->interval!=0){
+      //printf("%p\n",r_satp());
+      //printf("%p\n",p->pagetable);
+    p->tick++;
+    if(p->tick==p->interval){
+        p->tick=0;
+        if(p->ready==1){
+            p->ready=0;
+            p->epc=p->trapframe->epc;
+            p->sp=p->trapframe->sp;
+            p->ra=p->trapframe->ra;
+            p->fp=p->trapframe->s0;
+            p->a0=p->trapframe->a0;
+            p->a1=p->trapframe->a1;
+            p->a2=p->trapframe->a2;
+            p->a3=p->trapframe->a3;
+            p->a4=p->trapframe->a4;
+            p->a5=p->trapframe->a5;
+            p->a6=p->trapframe->a6;
+            p->a7=p->trapframe->a7;
+            p->trapframe->epc=p->func;
+        }
+    }
+  }
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
     yield();
