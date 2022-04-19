@@ -195,6 +195,30 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   }
 }
 
+void
+luvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
+{
+    uint64 a;
+    pte_t *pte;
+
+    if((va % PGSIZE) != 0)
+        panic("uvmunmap: not aligned");
+
+    for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
+        if((pte = walk(pagetable, a, 0)) == 0)
+            continue;
+        if((*pte & PTE_V) == 0)
+            continue;
+        //panic("uvmunmap: not mapped");
+        if(PTE_FLAGS(*pte) == PTE_V)
+            panic("uvmunmap: not a leaf");
+        if(do_free){
+            uint64 pa = PTE2PA(*pte);
+            kfree((void*)pa);
+        }
+        *pte = 0;
+    }
+}
 // create an empty user page table.
 // returns 0 if out of memory.
 pagetable_t
@@ -264,7 +288,7 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 
   if(PGROUNDUP(newsz) < PGROUNDUP(oldsz)){
     int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PGSIZE;
-    uvmunmap(pagetable, PGROUNDUP(newsz), npages, 1);
+    luvmunmap(pagetable, PGROUNDUP(newsz), npages, 1);
   }
 
   return newsz;
@@ -296,7 +320,7 @@ void
 uvmfree(pagetable_t pagetable, uint64 sz)
 {
   if(sz > 0)
-    uvmunmap(pagetable, 0, PGROUNDUP(sz)/PGSIZE, 1);
+    luvmunmap(pagetable, 0, PGROUNDUP(sz)/PGSIZE, 1);
   freewalk(pagetable);
 }
 
@@ -334,6 +358,35 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
  err:
   uvmunmap(new, 0, i / PGSIZE, 1);
   return -1;
+}
+
+int luvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
+{
+    pte_t *pte;
+    uint64 pa, i;
+    uint flags;
+    char *mem;
+
+    for(i = 0; i < sz; i += PGSIZE){
+        if((pte = walk(old, i, 0)) == 0)
+            continue;
+        if((*pte & PTE_V) == 0)
+            continue;
+        pa = PTE2PA(*pte);
+        flags = PTE_FLAGS(*pte);
+        if((mem = kalloc()) == 0)
+            goto err;
+        memmove(mem, (char*)pa, PGSIZE);
+        if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
+            kfree(mem);
+            goto err;
+        }
+    }
+    return 0;
+
+    err:
+    uvmunmap(new, 0, i / PGSIZE, 1);
+    return -1;
 }
 
 // mark a PTE invalid for user access.

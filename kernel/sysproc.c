@@ -41,6 +41,7 @@ sys_wait(void)
 uint64
 sys_sbrk(void)
 {
+    //lazy alloc,but eager dealloc
   int oldaddr;
   int n;
 
@@ -48,8 +49,10 @@ sys_sbrk(void)
     return -1;
   oldaddr = myproc()->sz;
   myproc()->sz+=n;
-  //if(growproc(n) < 0)
-  //  return -1;
+    //printf("oldaddr %d\n",oldaddr);
+    //printf(" %d\n",myproc()->)
+    if(n < 0)
+      uvmdealloc(myproc()->pagetable, oldaddr, oldaddr + n);
   return oldaddr;
 }
 

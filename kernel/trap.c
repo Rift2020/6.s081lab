@@ -33,6 +33,7 @@ trapinithart(void)
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
 //
+
 void
 usertrap(void)
 {
@@ -67,19 +68,39 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  }else if(r_scause()==15||r_scause()==13){
-      printf("page fault catch!\n");
-      char *onepage;
-    onepage=kalloc();
-    if(onepage==0){
-        //can not kalloc
-    }
-    memset(onepage, 0, PGSIZE);
-    if(mappages(p->pagetable,PGROUNDDOWN(r_stval()), PGSIZE, (uint64)onepage, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
-        //can not map
-        kfree(onepage);
-        uvmunmap(p->pagetable, PGROUNDDOWN(r_stval()), 1, 1);
-    }
+  }else if(r_scause()==15||r_scause()==13||r_scause()==12){
+      if(r_scause()==12){
+          printf("here!!\n");
+      }
+      //printf("page fault catch!\n");
+      if(r_stval()<=p->sz){
+          char *onepage;
+          onepage=kalloc();
+          if(onepage==0){
+              //can not kalloc
+              printf("can not kalloc\n");
+              printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+              printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+              p->killed = 1;
+          }
+          else{
+              memset(onepage, 0, PGSIZE);
+              if(mappages(p->pagetable,PGROUNDDOWN(r_stval()), PGSIZE, (uint64)onepage, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+                  //can not map
+                  printf("can not map\n");
+                  kfree(onepage);
+                  uvmunmap(p->pagetable, PGROUNDDOWN(r_stval()), 1, 1);
+              }
+          }
+
+      }
+      else{
+          //(stval > p->sz),kill this process
+          printf("stval>p->sz\n");
+          printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+          printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+          p->killed = 1;
+      }
   }
   else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
@@ -151,16 +172,15 @@ kerneltrap()
   uint64 sepc = r_sepc();
   uint64 sstatus = r_sstatus();
   uint64 scause = r_scause();
-  
   if((sstatus & SSTATUS_SPP) == 0)
     panic("kerneltrap: not from supervisor mode");
   if(intr_get() != 0)
     panic("kerneltrap: interrupts enabled");
 
   if((which_dev = devintr()) == 0){
-    printf("scause %p\n", scause);
-    printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
-    panic("kerneltrap");
+      printf("scause %p\n", scause);
+      printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
+      panic("kerneltrap");
   }
 
   // give up the CPU if this is a timer interrupt.
