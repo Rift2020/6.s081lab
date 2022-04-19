@@ -67,7 +67,37 @@ argint(int n, int *ip)
 int
 argaddr(int n, uint64 *ip)
 {
+
+    struct proc *p = myproc();
   *ip = argraw(n);
+    //printf("1\n");
+  if(walkaddr(p->pagetable,*ip)!=0)return 0;
+    if(p->trapframe->sp < *ip && *ip < p->sz){
+        char *onepage;
+        onepage=kalloc();
+        if(onepage==0){
+            //can not kalloc
+            printf("argaddr:can not kalloc\n");
+            return -1;
+        }
+        else{
+            memset(onepage, 0, PGSIZE);
+            if(mappages(p->pagetable,PGROUNDDOWN(*ip), PGSIZE, (uint64)onepage, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
+                //can not map
+                printf("can not map\n");
+                kfree(onepage);
+                uvmunmap(p->pagetable, PGROUNDDOWN(*ip), 1, 1);
+                return -1;
+            }
+        }
+
+    }
+    else{
+        //(stval > p->sz),kill this process
+        printf("*ip>p->sz\n");
+        return -1;
+    }
+
   return 0;
 }
 

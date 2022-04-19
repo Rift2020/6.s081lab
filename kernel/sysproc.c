@@ -51,6 +51,7 @@ sys_sbrk(void)
   myproc()->sz+=n;
     //printf("oldaddr %d\n",oldaddr);
     //printf(" %d\n",myproc()->)
+    if(oldaddr+n<0)return -1;
     if(n < 0)
       uvmdealloc(myproc()->pagetable, oldaddr, oldaddr + n);
   return oldaddr;

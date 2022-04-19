@@ -69,11 +69,11 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   }else if(r_scause()==15||r_scause()==13||r_scause()==12){
-      if(r_scause()==12){
-          printf("here!!\n");
-      }
+      //if(r_scause()==12){
+      //    printf("here!!\n");
+      //}
       //printf("page fault catch!\n");
-      if(r_stval()<=p->sz){
+      if(r_stval()<p->sz&&r_stval()>p->trapframe->sp){
           char *onepage;
           onepage=kalloc();
           if(onepage==0){
