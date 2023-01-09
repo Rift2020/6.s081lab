@@ -65,7 +65,40 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } else if((which_dev = devintr()) != 0){
+  }else if(r_scause()==15){
+	  uint64 va=r_stval();
+      uint64 pa;
+      char *mem;
+      pte_t *pte;
+      uint flags;
+      if((pte = walk(p->pagetable, va, 0)) == 0)
+          panic("usertrap:15:pte should exist");
+      if((*pte & PTE_V) == 0)
+          panic("usertrap:15:page not present");
+	if((*pte&PTE_COW)==0){
+          panic("usertrap:15:write a non-cow page");
+      }
+      if((mem = kalloc()) == 0){
+			printf("usertrap:15:OOM\n");
+			p->killed=1;
+	  }
+	  else{
+		  *pte=(*pte|PTE_W)&(~PTE_COW);
+		  flags = PTE_FLAGS(*pte);
+		  pa = PTE2PA(*pte);
+		  memmove(mem, (char*)pa, PGSIZE);
+		  uvmunmap(p->pagetable,PGROUNDDOWN(va),1,1);
+		  if(mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)mem, flags) != 0){
+
+			  //kfree(mem);
+			  //uvmunmap(new, 0, i / PGSIZE, 1);
+			  panic("usertrap:15:mappage fail\n");
+		  }
+
+	  }
+              
+  }
+  else if((which_dev = devintr()) != 0){
     // ok
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
